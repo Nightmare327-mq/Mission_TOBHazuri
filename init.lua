@@ -1,9 +1,5 @@
 -- Mission_TOBHazuri
--- Version 1.0
--- TODO: Handle the Red Lord if he aggroes (Atathus)
--- DONE: Once Hazuri is below 5% and no Replicants are up, cmcentrate on killing him 
--- DONE: Add switch for whether we want to go for 'The Best For Last' achievement
--- TODO: Setup the burn mob count to 5 to avoid triggering during opening phase
+-- Version 1.1
 ---------------------------
 local mq = require('mq')
 local lip = require('lib.LIP')
@@ -77,7 +73,7 @@ local function load_settings()
 local function MoveToSpawn(spawn, distance)
     if (distance == nil) then distance = 15 end
 
-    if (spawn == nil or spawn.ID() == nil) then return end
+    if (spawn == nil or spawn.ID() == nil) then return false end
     if (spawn.Distance() < distance) then return true end
 
     mq.cmdf('/squelch /nav id %d npc |dist=%s log=off', spawn.ID(), distance)
@@ -98,7 +94,10 @@ local function MoveToId(spawn_id, distance)
 end
 local function MoveToAndTarget(spawn)
     if MoveTo(spawn) == false then return false end
-    mq.cmdf('/squelch /mqtarget %s', spawn)
+    while mq.TLO.Target.CleanName() ~= mq.TLO.Spawn(spawn).CleanName() do 
+        mq.cmdf('/eqtarget %s npc', spawn) 
+        mq.delay(10)
+    end
     mq.delay(250)
     return true
 end
@@ -106,6 +105,19 @@ end
 local function MoveToAndAct(spawn,cmd)
     if MoveToAndTarget(spawn) == false then return false end
     mq.cmd(cmd)
+    return true
+end
+
+local function MoveToAndAttack(spawn)
+    if MoveTo(spawn) == false then return false end
+    while mq.TLO.Target.CleanName() ~= mq.TLO.Spawn(spawn).CleanName() do 
+        mq.cmdf('/eqtarget %s npc', spawn) 
+        mq.delay(10)
+    end
+    mq.delay(250)
+    if mq.TLO.Target.CleanName() == mq.TLO.Spawn(spawn).CleanName() and mq.TLO.Me.Combat() == false then 
+        mq.cmd('/attack on') 
+    end
     return true
 end
 
@@ -293,7 +305,7 @@ local function StopAttack()
 	mq.cmdf('/%s CheckPriorityTarget off nosave', my_class )
 	mq.cmdf('/%s Mode manual nosave', my_class )
 	logger.debug('StopAttack branch...')
-	if mq.TLO.Target.CleanName() ~= my_name then mq.cmdf('/mqtarget %s', my_name) end
+	if mq.TLO.Target.CleanName() ~= my_name then mq.cmdf('/eqtarget %s', my_name) end
 end
 
 local function ZoneIn(npcName, zoneInPhrase, quest_zone)
@@ -302,7 +314,7 @@ local function ZoneIn(npcName, zoneInPhrase, quest_zone)
     for g = 1, GroupSize, 1 do
         local Member = mq.TLO.Group.Member(g).Name()
         logger.info('\ay-->%s<--\apShould Be Zoning In Now', Member)
-        mq.cmdf('/dex %s /mqtarget %s', Member, npcName)
+        mq.cmdf('/dex %s /eqtarget %s', Member, npcName)
         mq.delay(2000) -- Add a random delay ?
         mq.cmdf('/dex %s /say %s', Member, zoneInPhrase)
     end
@@ -312,7 +324,7 @@ local function ZoneIn(npcName, zoneInPhrase, quest_zone)
         mq.delay(2000)
     end
     if mq.TLO.Target.CleanName() ~= npcName then
-        mq.cmdf('/mqtarget %s', npcName)
+        mq.cmdf('/eqtarget %s', npcName)
         mq.delay(5000)
         mq.cmdf('/say %s', zoneInPhrase)
     else
@@ -423,9 +435,19 @@ local function waitForGroupToZone(timeoutSec)
     return false
 end
 
-local function MoveToPool()
-    mq.cmd('/dgga /nav spawn pool')
-    mq.cmd('/dgga /nav spawn puddle')
+-- local function MoveToPool()
+--     mq.cmd('/dgga /nav spawn pool')
+--     mq.cmd('/dgga /nav spawn puddle')
+-- end
+
+local function DoPrep()
+    mq.cmd('/cwtn mode chase nosave')
+    mq.cmdf('/%s mode sictank nosave', my_class)
+    mq.cmdf('/%s pause off', my_class)
+    mq.cmdf('/%s checkprioritytarget off nosave', my_class)
+    mq.cmdf('/%s resetcamp', my_class)
+    mq.cmd('/dgga /makemevis')
+    mq.cmd('/cwtna burnalways on nosave')
 end
 
 local function ClearStartingSetup()
@@ -439,7 +461,7 @@ end
 local function action_openChest()
     mq.cmd('/squelch /nav spawn _chest | log=off')
     while mq.TLO.Nav.Active() do mq.delay(5) end
-    mq.cmd('/mqtarget _chest')
+    mq.cmd('/eqtarget _chest')
     mq.delay(250)
     mq.cmd('/open')
 end
@@ -493,29 +515,27 @@ while Ready == false do
 	mq.delay(5000)
 end
 
-logger.info('Doing some setup. Invising and moving to spot.')
+-- in case you are starting the script after you reach teh camp spot
+if math.abs(mq.TLO.Me.Y() + 286) > 15 or math.abs(mq.TLO.Me.X() + 282) > 15 then
+    logger.info('Doing some setup. Invising and moving to spot.')
 
-DBLinvis()
+    DBLinvis()
 
-mq.delay(10000)
+    mq.delay(10000)
 
--- Nav in 2 steps to avoid mobs if at all possible
-mq.cmd('/squelch /dgga /nav locyx -50 152 log=off')
-WaitForNav()
+    -- Nav in 2 steps to avoid mobs if at all possible
+    mq.cmd('/squelch /dgga /nav locyx -50 152 log=off')
+    WaitForNav()
 
-mq.cmd('/squelch /dgga /nav locyx -286 -282 log=off')
-WaitForNav()
+    mq.cmd('/squelch /dgga /nav locyx -286 -282 log=off')
+    WaitForNav()
+end
 
 logger.info('Doing some setup...')
 
 mq.delay(2000)
-mq.cmd('/cwtn mode 2 nosave')
-mq.cmdf('/%s mode 0 nosave', my_class)
-mq.cmdf('/%s mode 7 nosave', my_class)
-mq.cmdf('/%s pause off', my_class)
-mq.cmdf('/%s checkprioritytarget off nosave', my_class)
-mq.cmdf('/%s resetcamp', my_class)
-mq.cmd('/dgga /makemevis')
+
+DoPrep()
 
 print('Starting the event in 10 seconds!')
 
@@ -529,11 +549,12 @@ while mq.TLO.Navigation.Active() == true do
 	mq.delay(10)
 end
 
-mq.cmd('/tar Atathus')
-mq.delay(300)
-mq.cmd('/say fight')
+MoveToAndSay('Atathus', 'fight')
+
+-- mq.cmd('/eqtarget Atathus')
+-- mq.delay(300)
+-- mq.cmd('/say fight')
 mq.cmdf('/%s gotocamp', my_class)
-mq.cmd('/cwtna burnalways on nosave')
 
 while mq.TLO.SpawnCount("Hazuri xtarhater")() < 1 do
 	mq.delay(100)
@@ -564,59 +585,53 @@ while true do
 		break
 	end
 
-	if (mq.TLO.SpawnCount('An altered artificer npc')() + mq.TLO.SpawnCount('An altered skyguard npc')() 
+    if (mq.TLO.SpawnCount('Brood Architect Hazuri npc')() > 0 and mq.TLO.Spawn('Brood Architect Hazuri').PctHPs() < 10 and mq.TLO.SpawnCount('Hazuri Replicant npc')() == 0) then 
+        logger.debug('Brood Architect Hazuri Attack branch at end...')
+        MoveToAndAttack('Brood Architect Hazuri')
+	elseif (mq.TLO.SpawnCount('An altered artificer npc')() + mq.TLO.SpawnCount('An altered skyguard npc')() 
 		+ mq.TLO.SpawnCount('An altered overseer npc')() + mq.TLO.SpawnCount('An altered striker npc')()  > 0)
 		or (mq.TLO.SpawnCount('Hazuri Replicant npc')() > 0 and mq.TLO.Spawn('Brood Architect Hazuri').PctHPs() < 10)
 		then 
 		logger.debug('In AddsUp section')
-		if mq.TLO.Spawn('Brood Architect Hazuri').PctHPs() < 10 and mq.TLO.SpawnCount('Hazuri Replicant npc radius 60')() > 0 then 
+		if mq.TLO.SpawnCount('Brood Architect Hazuri npc')() > 0 and mq.TLO.Spawn('Brood Architect Hazuri').PctHPs() < 10 and mq.TLO.SpawnCount('Hazuri Replicant npc radius 60')() > 0 then 
 			logger.debug('Hazuri Replicant Attack branch...')
-			if mq.TLO.Target.CleanName() ~= mq.TLO.Spawn('Hazuri Replicant').CleanName() then mq.cmd('/mqtarget Hazuri Replicant npc') end
-			mq.delay(100)
-			mq.cmd('/attack on')
+            MoveToAndAttack('Hazuri Replicant')
         elseif mq.TLO.SpawnCount('Hazuri Replicant npc radius 60')() > 0 and settings.general.BestForLast == false then 
 			logger.debug('Hazuri Replicant Attack branch based on flag...')
-			if mq.TLO.Target.CleanName() ~= mq.TLO.Spawn('Hazuri Replicant').CleanName() then mq.cmd('/mqtarget Hazuri Replicant npc') end
-			mq.delay(100)
-			mq.cmd('/attack on')
-		elseif mq.TLO.SpawnCount('An altered artificer npc radius 60')() > 0 then 
+            MoveToAndAttack('Hazuri Replicant')
+        elseif mq.TLO.SpawnCount('An altered artificer npc radius 60')() > 0 then 
 			logger.debug('artificer Attack branch...')
-			if mq.TLO.Target.CleanName() ~= mq.TLO.Spawn('An altered artificer').CleanName() then mq.cmd('/mqtarget artificer npc') end
-			mq.delay(100)
-			mq.cmd('/attack on')
-		elseif mq.TLO.SpawnCount('An altered skyguard  npc radius 60')() > 0 then 
+            MoveToAndAttack('An altered artificer')
+		elseif mq.TLO.SpawnCount('An altered skyguard npc radius 60')() > 0 then 
 			logger.debug('skyguard Attack branch...')
-			if mq.TLO.Target.CleanName() ~= mq.TLO.Spawn('An altered skyguard').CleanName() then mq.cmd('/mqtarget An altered skyguard npc') end
-			mq.delay(100)
-			mq.cmd('/attack on')
+            MoveToAndAttack('An altered skyguard')
 		elseif mq.TLO.SpawnCount('An altered striker npc radius 60')() > 0 then 
 			logger.debug('striker Attack branch...')
-			if mq.TLO.Target.CleanName() ~= mq.TLO.Spawn('An altered striker').CleanName() then mq.cmd('/mqtarget An altered striker npc') end
-			mq.delay(100)
-			mq.cmd('/attack on')
+			MoveToAndAttack('An altered striker')
 		elseif mq.TLO.SpawnCount('An altered overseer npc radius 60')() > 0 then 
 			logger.debug('overseer Attack branch...')
-			if mq.TLO.Target.CleanName() ~= mq.TLO.Spawn('An altered overseer').CleanName() then mq.cmd('/mqtarget An altered overseer npc') end
-			mq.delay(100)
-			mq.cmd('/attack on')
+			MoveToAndAttack('An altered overseer')
 		else  
 			StopAttack()
 		end
 	else
-		logger.debug('Brood Architect Hazuri Attack branch...')
-		if mq.TLO.Target.CleanName() ~= mq.TLO.Spawn('Brood Architect Hazuri').CleanName() then mq.cmd('/mqtarget Brood Architect Hazuri npc') end
-		mq.cmdf('/%s Mode sictank nosave', my_class)
-		mq.delay(100)
-		mq.cmd('/attack on')
+        if mq.TLO.SpawnCount('Brood Architect Hazuri npc')() > 0 then 
+            logger.debug('Brood Architect Hazuri Attack branch...')
+            MoveToAndAttack('Brood Architect Hazuri') 
+        end
 	end
 
     if mq.TLO.Target() ~= nil then 
-        if mq.TLO.Target.Distance() > 20 then mq.cmd('/squelch /nav target distance=20 log=off') end
+        if mq.TLO.Target.Distance() > 20 then
+            mq.cmd('/squelch /nav target distance=20 log=off') 
+            WaitForNav()
+        end
     end
 			
 	if math.abs(mq.TLO.Me.Y() + 286) > 15 or math.abs(mq.TLO.Me.X() + 282) > 15 then
 		if math.random(1000) > 800 then
 			mq.cmd('/squelch /nav locyx -286 -282 log=off')
+            WaitForNav()
 		end
 	end
 	mq.delay(100)
