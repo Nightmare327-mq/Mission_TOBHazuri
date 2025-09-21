@@ -1,8 +1,7 @@
 -- Mission_TOBHazuri
 -- Version 1.2
 -- TODO: Implement bc support if asked for
--- TODO: Inmplement RGMercs.lua support if asked for (it has been)
--- TODO: Make the  writiing of an ini for run parameters optional, and off by default
+-- TODO: Implement RGMercs.lua support if asked for (it has been)
 ---------------------------
 local mq = require('mq')
 LIP = require('lib.LIP')
@@ -27,15 +26,24 @@ local delay_before_zoning = 27000  -- 27s
 
 Settings = {
     general = {
-        GroupMessage = "dannet",    -- or "bc" - not yet implemented
-        BestForLast = true,         -- true if you want to do this achievement during the run, false if you will skip it and kill the Replicants as they spawn
-        OpenChest = false,          -- true if you want to open the chest automatically at the end of the mission run
-        Automation = 'CWTN',        -- automation method, 'CWTN' fro the CWTN plugins, or 'rgmercs' for the rgmercs lua automation.  KissAssist is not really supported currenlty, though it might work
+        GroupMessage = "dannet",        -- or "bc" - not yet implemented
+        BestForLast = true,             -- true if you want to do this achievement during the run, false if you will skip it and kill the Replicants as they spawn
+        OpenChest = false,              -- true if you want to open the chest automatically at the end of the mission run. I normally do not do this as you can swap toon's out before opening the chest to get the achievements
+        Automation = 'CWTN',            -- automation method, 'CWTN' for the CWTN plugins, or 'rgmercs' for the rgmercs lua automation.  KissAssist is not really supported currently, though it might work
+        WriteCharacterIni = false,      -- Write/read character specific ini file to be able to run different groups with different parameters.  This must be changed in this section of code to take effect
     }
 }
 -- #endregion
 
-Load_settings()
+if (Settings.general.WriteCharacterIni == true) then
+    Logger.info('\aw Write Character Ini: \aytrue\aw.')
+    Load_settings()
+elseif (Settings.general.WriteCharacterIni == false) then
+    Logger.info('\aw Write Character Ini: \ayfalse\aw.')
+else
+    Logger.info('\aw Write Character Ini: \ar Invalid value. You can only use true or false.  Exiting script until you fix the issue.\ar.')
+    os.exit()
+end
 
 if (Settings.general.GroupMessage == 'dannet') then
    Logger.info('\aw Group Chat: \ayDanNet\aw.')
