@@ -26,6 +26,14 @@ Load_settings=function ()
             Settings.general.GroupMessage = 'dannet'
             is_dirty = true
         end
+        if (Settings.general.Automation == nil) then
+            Settings.general.Automation = 'CWTN'
+            is_dirty = true
+        end
+        if (Settings.general.Burn == nil) then
+            Settings.general.Burn = true
+            is_dirty = true
+        end
 		if (Settings.general.BestForLast == nil) then
             Settings.general.BestForLast = true
             is_dirty = true
@@ -34,10 +42,11 @@ Load_settings=function ()
             Settings.general.OpenChest = false
             is_dirty = true
         end
-        if (Settings.general.Automation == nil) then
-            Settings.general.Automation = 'CWTN'
+        if (Settings.general.WriteCharacterIni == nil) then
+            Settings.general.WriteCharacterIni = true
             is_dirty = true
         end
+
         if (is_dirty) then LIP.save(config_path, Settings) end
     end
  end
@@ -187,33 +196,56 @@ ClassShortName = function(x)
     return y
 end
 
-All_Double_Invis = function()
-    local dbl_invis_status = false
+All_Invis = function(mode)
+    
+    local all_invis_status = false
     local grpsize = mq.TLO.Group.Members()
 
     for gm = 0,grpsize do
         local name = mq.TLO.Group.Member(gm).Name()
         local result1 = Query(name, 'Me.Invis[1]', 100) 
         local result2 = Query(name, 'Me.Invis[2]', 100)
-        local both_result = false
+        local invis_result = false
         
-        if result1 == 'TRUE' and result2 == 'TRUE' then
-            both_result = true
-            Logger.debug(string.format("\ay%s \at%s \ag%s", name, "DBL Invis: ", both_result))
-        else
-            Logger.debug('gm'..gm)
-            break
+        if mode == 1 then 
+            if result1 == 'TRUE' then
+                invis_result = true
+                Logger.debug(string.format("\ay%s \at%s \ag%s", name, "Invis: ", invis_result))
+            else
+                Logger.debug('group member'..gm)
+                break
+            end
+        end
+        if mode == 2 then 
+            if result2 == 'TRUE' then
+                invis_result = true
+                Logger.debug(string.format("\ay%s \at%s \ag%s", name, "DBL Invis: ", invis_result))
+            else
+                Logger.debug('group member'..gm)
+                break
+            end
+        end
+        if mode == 3 then 
+            if result1 == 'TRUE' and result2 == 'TRUE' then
+                invis_result = true
+                Logger.debug(string.format("\ay%s \at%s \ag%s", name, "DBL Invis: ", invis_result))
+            else
+                Logger.debug('group member'..gm)
+                break
+            end
         end
 
         if gm == grpsize then
-            dbl_invis_status = true
+            all_invis_status = true
         end
     end
-    return dbl_invis_status
+    return all_invis_status
 end
 
-The_Invis_Thing = function()
+The_Invis_Thing = function(mode)
+    -- mode: 1 = Regular Invis, 2 = Invis Versus Undead (IVU) 3 = Double Invis
     --if i am bard or group has bard, do the bard invis thing
+    -- this will apply to any mode, as it is a one-time cast, rather than a combination of casting characters
     if mq.TLO.Spawn('Group Bard').ID()>0 then
         local bard = mq.TLO.Spawn('Group Bard').Name()
             if bard == mq.TLO.Me.Name() then
@@ -222,7 +254,7 @@ The_Invis_Thing = function()
                     mq.cmdf('/dex %s /multiline ; /stopsong; /timed 1 /alt act 3704; /timed 3 /alt act 231', bard)
             end
             Logger.info('\ag-->\atINVer: \ay',bard, '\at IVUer: \ay', bard,'\ag<--')
-        else
+    else
     --without a bard, find who can invis and who can IVU
         local inver = 0
         local ivuer = 0
@@ -250,7 +282,6 @@ The_Invis_Thing = function()
                 if string.find("ENC MAG WIZ", ClassShortName(i)) ~= nil then
                     inver = i
                     break
-
                 end    
             end
         end
@@ -260,8 +291,14 @@ The_Invis_Thing = function()
                 if string.find("ENC MAG WIZ", ClassShortName(i)) ~= nil then
                     ivuer = i
                     if i == inver then
-                        Logger.info('\arUnable to Double Invis')
-                        mq.exit()  
+                        if mode == 3 then 
+                            Logger.info('\arUnable to Double Invis')
+                            mq.exit()  
+                        end
+                        if mode == 2 then 
+                            Logger.info('\arUnable to IVU')
+                            mq.exit()  
+                        end
                     end
                 break
                 end
@@ -270,50 +307,70 @@ The_Invis_Thing = function()
 
         --catch anyone else in group
         if string.find("WAR MNK ROG BER", ClassShortName(inver)) ~= nil or string.find("WAR MNK ROG BER", ClassShortName(ivuer)) ~= nil then
-            Logger.info('\arUnable to Double Invis')
-            mq.exit()
+            if mode == 3 then 
+                Logger.info('\arUnable to Double Invis')
+                mq.exit()  
+            end
         end
 
-        Logger.info('\ag-->\atINVer: \ay%s\at IVUer: \ay%s\ag<--', mq.TLO.Group.Member(inver).Name(), mq.TLO.Group.Member(ivuer).Name())
+        if inver >= 0 then 
+            Logger.info('\ag-->\atINVer: \ay%s<--', mq.TLO.Group.Member(inver).Name())
+        end
+        if ivuer >= 0 then 
+            Logger.info('\ag-->\atIVUer: \ay%s<--', mq.TLO.Group.Member(ivuer).Name())
+        end
+        
+        -- Logger.info('\ag-->\atINVer: \ay%s\at IVUer: \ay%s\ag<--', mq.TLO.Group.Member(inver).Name(), mq.TLO.Group.Member(ivuer).Name())
         
         --if i am group leader and can INVIS, then do the INVIS thing
-        if ClassShortName(inver) == 'SHM' and inver == 0 then
+        if mode ~= 2 then 
+            if ClassShortName(inver) == 'SHM' and inver == 0 then
                 mq.cmd('/multiline ; /stopcast; /timed 3 /alt act 630')
             elseif string.find("ENC MAG WIZ", ClassShortName(inver)) ~= nil then
                 mq.cmd('/multiline ; /stopcast; /timed 1 /alt act 1210')
             elseif string.find("RNG DRU", ClassShortName(inver)) ~= nil then
                 mq.cmd('/multiline ; /stopcast; /timed 1 /alt act 518')
-        end
+            end
 
-        --if i have an INVISER in the group, then 'tell them' do the INVIS thing
-        if ClassShortName(inver) == 'SHM' and inver ~= 0 then
-                Tell(4,inver,630)
-            elseif string.find("ENC MAG WIZ", ClassShortName(inver)) ~= nil then
-                Tell(0,inver,1210)
-            elseif string.find("RNG DRU", ClassShortName(inver)) ~= nil then
-                Tell(5,inver,518)
+            --if i have an INVISER in the group, then 'tell them' do the INVIS thing
+            if ClassShortName(inver) == 'SHM' and inver ~= 0 then
+                    Tell(4,inver,630)
+                elseif string.find("ENC MAG WIZ", ClassShortName(inver)) ~= nil then
+                    Tell(0,inver,1210)
+                elseif string.find("RNG DRU", ClassShortName(inver)) ~= nil then
+                    Tell(5,inver,518)
+            end
         end
         
-        --if i am group leader and can IVU, then do the IVU thing
-        if string.find("CLR NEC PAL SHD", ClassShortName(ivuer)) ~= nil and ivuer == 0 then
-                mq.cmd('/multiline ; /stopcast; /timed 1 /alt activate 1212')
-            else
-                mq.cmd('/multiline ; /stopcast; /timed 1 /alt activate 280')
+        if mode >= 2 then 
+            --if i am group leader and can IVU, then do the IVU thing
+            if string.find("CLR NEC PAL SHD", ClassShortName(ivuer)) ~= nil and ivuer == 0 then
+                    mq.cmd('/multiline ; /stopcast; /timed 1 /alt activate 1212')
+                else
+                    mq.cmd('/multiline ; /stopcast; /timed 1 /alt activate 280')
+            end
+            
+            --if i have an IVUER in the group, then 'tell them' do the IVU thing
+            if string.find("CLR NEC PAL SHD", ClassShortName(ivuer)) ~= nil and ivuer ~= 0 then
+                    Tell(2,ivuer,1212)    
+                else
+                    Tell(2,ivuer,280)
+            end
         end
         
-        --if i have an IVUER in the group, then 'tell them' do the IVU thing
-        if string.find("CLR NEC PAL SHD", ClassShortName(ivuer)) ~= nil and ivuer ~= 0 then
-                Tell(2,ivuer,1212)    
-            else
-                Tell(2,ivuer,280)
-        end
     end
     mq.delay(8000)
 end
 
-DBLinvis = function()
-    while not All_Double_Invis() do
-        The_Invis_Thing()
+GroupInvis = function(mode)
+    -- mode: 1 = Regular Invis, 2 = Invis Versus Undead (IVU) 3 = Double Invis
+    if mode == nil then mode = 3 end
+    if mode ~= 1 and mode ~= 2 and mode ~= 3 then 
+        Logger.info('You called the Invis routine with an incorrect parameter (%s). You must call it with a 1, 2, or 3', mode)
+        os.exit()
+    end
+    while not All_Invis(mode) do
+        The_Invis_Thing(mode)
          mq.delay(5000)
     end
 end
@@ -321,6 +378,7 @@ end
 CheckGroupStats = function()
 	local ready = true
 	local groupSize = mq.TLO.Group()
+    if mq.TLO.Group.AnyoneMissing() then return false end
    
     for i = groupSize, 0, -1 do
 		-- if DEBUG and ( mq.TLO.Group.Member(i).PctHPs() < 99 or  mq.TLO.Group.Member(i).PctEndurance() < 99 or (mq.TLO.Group.Member(i).PctMana() ~= 0 and  mq.TLO.Group.Member(i).PctMana() < 99)) then 
@@ -332,6 +390,36 @@ CheckGroupStats = function()
     end
 	-- mq.delay(5000)
     return ready
+end
+
+-- Function to check the distance of all group members
+CheckGroupDistance = function (max_distance)
+    local allWithinRange = true
+    -- mq.TLO.Group.Size() returns the number of people in your group, including yourself.
+    local group_size = mq.TLO.Group()
+
+    -- Loop through each member of the group, starting from index 1.
+    -- Index 0 is the character running the script.
+    for i = 1, group_size - 1 do
+        -- Get the group member object for the current index
+        local member = mq.TLO.Group.Member(i)
+        
+        -- Check if the member exists and is not null (e.g., they are in the zone)
+        if member() then
+            -- Get the distance from yourself (mq.TLO.Me) to the group member
+            local distance = member.Distance()
+            Logger.debug('Group Member %s is at distance %s', member.Name(), distance)
+
+            -- Check if the distance is greater than the defined maximum
+            if distance > max_distance then
+                allWithinRange = false
+                -- If they are too far, print a warning message in the chat window
+                -- string.format is used to insert the member's name and distance into the message
+                Logger.info('Group Member %s is too far away: %s', member.Name(), distance)
+            end
+        end
+    end
+    return allWithinRange
 end
 
 StopAttack = function()
@@ -346,6 +434,11 @@ StopAttack = function()
 end
 
 ZoneIn = function(npcName, zoneInPhrase, quest_zone)
+    if Settings.general.Automation == 'CWTN' then 
+        Logger.info('Pausing CWTN modules so we can zone in')
+        mq.cmd('/cwtna pause on nosave')
+        mq.delay(250)
+    end
     local GroupSize = mq.TLO.Group.Members()
 
     for g = 1, GroupSize, 1 do
@@ -354,9 +447,16 @@ ZoneIn = function(npcName, zoneInPhrase, quest_zone)
         mq.cmdf('/dex %s /eqtarget %s', Member, npcName)
         mq.delay(math.random(2000, 4000))
         mq.cmdf('/dex %s /say %s', Member, zoneInPhrase)
+        local groupSpawn = mq.TLO.Group.Member(g).Spawn()
+        while groupSpawn ~= nil do 
+            mq.delay(5000)
+            Logger.debug('Waiting on %s to zone in...', Member)
+            groupSpawn = mq.TLO.Group.Member(g).Spawn()
+        end
     end
 
     -- This is to make us the last to zone in
+    -- does this really work?
     while mq.TLO.Group.AnyoneMissing() == false do
         mq.delay(2000)
     end
@@ -378,6 +478,13 @@ ZoneIn = function(npcName, zoneInPhrase, quest_zone)
         mq.delay(5000)
     end
     Zone_name = mq.TLO.Zone.ShortName()
+    if mq.TLO.Zone.ShortName() == quest_zone then 
+        if Settings.general.Automation == 'CWTN' then 
+            Logger.info('Un-Pausing CWTN modules after we have zoned in')
+            mq.cmd('/cwtna pause off nosave')
+            mq.delay(250)
+        end
+    end
 end
 
 Task = function(task_name, request_zone, request_npc, request_phrase)
@@ -477,26 +584,45 @@ WaitForGroupToZone = function(timeoutSec)
     return false
 end
 
+ZoneCheck = function(quest_zone)
+    Logger.debug('Doing ZoneCheck %s', quest_zone)
+    if mq.TLO.Zone.ShortName() ~= quest_zone then 
+        Logger.info('You are no longer in the mission zone.  Ending the script...')
+        ClearStartingSetup()
+        os.exit()
+    end
+end
+
 DoPrep = function()
-    cwtn_StartingMode = mq.TLO.CWTN.Mode()
-    Logger.debug('CWTN Starting Mode: %s', cwtn_StartingMode)
-    mq.cmd('/cwtn mode chase nosave')
-    mq.cmdf('/%s mode sictank nosave', my_class)
-    mq.cmdf('/%s Mode manual nosave', my_class ) -- temporary to test out exactly how the script itself is working
-    mq.cmdf('/%s pause off', my_class)
-    mq.cmdf('/%s checkprioritytarget off nosave', my_class)
-    mq.cmdf('/%s resetcamp', my_class)
+    if Settings.general.Automation == 'CWTN' then 
+        cwtn_StartingMode = mq.TLO.CWTN.Mode()
+        Logger.debug('CWTN Starting Mode: %s', cwtn_StartingMode)
+        mq.cmd('/cwtn mode chase nosave')
+        mq.cmdf('/%s mode sictank nosave', my_class)
+        mq.cmdf('/%s pause off', my_class)
+        mq.cmd('/cwtna pause off')
+        mq.cmdf('/%s checkprioritytarget off nosave', my_class)
+        mq.cmdf('/%s resetcamp', my_class)
+        if (Settings.general.Burn == true) then 
+            Logger.debug('Settings.general.Burn = %s', Settings.general.Burn)
+            Logger.debug('Setting BurnAlways on')
+            mq.cmd('/cwtna burnalways on nosave') 
+        else 
+            Logger.debug('Settings.general.Burn = %s', Settings.general.Burn)
+            Logger.debug('Setting BurnAlways off')
+            mq.cmd('/cwtna burnalways off nosave') 
+        end
+    end
     mq.cmd('/dgga /makemevis')
-    mq.cmd('/cwtna burnalways on nosave')
 end
 
 ClearStartingSetup = function()
     mq.delay(2000)
-    mq.cmd('/cwtn mode chase nosave')
-    mq.cmdf('/%s mode %s nosave', my_class, cwtn_StartingMode)
-    mq.cmdf('/%s pause off', my_class)
-    mq.cmdf('/%s checkprioritytarget on nosave', my_class)
-    mq.cmd('/hidecorpse none')
+    if Settings.general.Automation == 'CWTN' then 
+        mq.cmdf('/%s mode %s nosave', my_class, cwtn_StartingMode)
+        mq.cmdf('/%s pause off', my_class)
+        mq.cmdf('/%s checkprioritytarget on nosave', my_class)
+    end
 end
 
 Action_OpenChest = function()
