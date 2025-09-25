@@ -313,10 +313,10 @@ The_Invis_Thing = function(mode)
             end
         end
 
-        if inver >= 0 then 
+        if (inver >= 0 and mode ~= 2) then 
             Logger.info('\ag-->\atINVer: \ay%s<--', mq.TLO.Group.Member(inver).Name())
         end
-        if ivuer >= 0 then 
+        if (ivuer >= 0 and mode >= 2) then 
             Logger.info('\ag-->\atIVUer: \ay%s<--', mq.TLO.Group.Member(ivuer).Name())
         end
         
