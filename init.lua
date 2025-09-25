@@ -107,6 +107,7 @@ while Ready == false do
 	mq.cmd('/noparse /dgga /if (${Me.Standing}) /sit')
 	mq.delay(5000)
     ZoneCheck(quest_zone)
+    TaskCheck(Task_Name)
 end
 
 -- in case you are starting the script after you are in the mission zone - need to determine what area you are close to
@@ -156,6 +157,7 @@ while mq.TLO.SpawnCount("Hazuri xtarhater")() < 1 do
     end
 	mq.delay(1000)
     ZoneCheck(quest_zone)
+    TaskCheck(Task_Name)
 end
 
 local event_zoned = function(line)
@@ -235,6 +237,7 @@ while true do
 	end
 	mq.delay(1000)
     ZoneCheck(quest_zone)
+    TaskCheck(Task_Name)
 end
 
 if (Settings.general.OpenChest == true) then Action_OpenChest() end

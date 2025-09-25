@@ -566,10 +566,25 @@ GetGroupMembersNotInZone = function()
     return missing
 end
 
+TaskCheck = function(task_name)
+    Logger.debug('Doing TaskCheck for %s', task_name)
+    local task_check = mq.TLO.Task(task_name)
+    mq.delay(250)
+    Logger.debug('task_check = %s', task_check())
+    if (task_check() == nil) then 
+        Logger.info('You no longer have the mission task.  Ending the script...')
+        ClearStartingSetup()
+        os.exit()
+    end
+end
+
 --- Wait until all group members are in zone, or timeout
 ---@param timeoutSec number
 ---@return boolean
 WaitForGroupToZone = function(timeoutSec)
+    local checkTimer = 5000
+    local cycleCount = 0
+    local start_zone = mq.TLO.Zone.ShortName()
     local start = os.time()
     while os.difftime(os.time(), start) < timeoutSec do
         local notInZone = GetGroupMembersNotInZone()
@@ -578,7 +593,15 @@ WaitForGroupToZone = function(timeoutSec)
             return true
         end
         Logger.info("Still waiting on: " .. table.concat(notInZone, ", "))
-        mq.delay(5000)
+        mq.delay(checkTimer)
+        cycleCount = cycleCount + 1
+        if (cycleCount >= 10) then 
+            checkTimer = checkTimer + 5000 
+            cycleCount = 0
+            Logger.debug('checkTimer = %s', checkTimer)
+        end
+        ZoneCheck(start_zone)
+        -- TaskCheck(Task_name)
     end
     Logger.info("Timeout waiting for group members to zone.")
     return false
