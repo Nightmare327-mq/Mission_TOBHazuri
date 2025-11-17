@@ -24,15 +24,17 @@ local request_phrase = 'group'
 local zonein_phrase = 'ready'
 local quest_zone = 'harbingerscradle_mission'
 local delay_before_zoning = 27000  -- 27s
+local section = 0
 
 Settings = {
     general = {
         GroupMessage = 'dannet',        -- or "bc" - not yet implemented
         Automation = 'CWTN',            -- automation method, 'CWTN' for the CWTN plugins, or 'rgmercs' for the rgmercs lua automation.  KissAssist is not really supported currently, though it might work
+        PreManaCheck = false,           -- true to pause until the check for everyone's mana, endurance, hp is full before proceeding, false if it stalls at that point
         Burn = true,                    -- Whether we should burn by default. Some people have a bit of trouble handling the adds when the yburn, so you are able to turn this off if you want
         BestForLast = true,             -- true if you want to do this achievement during the run, false if you will skip it and kill the Replicants as they spawn
         OpenChest = false,              -- true if you want to open the chest automatically at the end of the mission run. I normally do not do this as you can swap toon's out before opening the chest to get the achievements
-        WriteCharacterIni = true,      -- Write/read character specific ini file to be able to run different groups with different parameters.  This must be changed in this section of code to take effect
+        WriteCharacterIni = true,       -- Write/read character specific ini file to be able to run different groups with different parameters.  This must be changed in this section of code to take effect
     }
 }
 -- #endregion
@@ -45,6 +47,7 @@ if (Settings.general.GroupMessage ~= 'dannet' and Settings.general.GroupMessage 
 end
 
 Logger.info('\awAutomation: \ay%s', Settings.general.Automation)
+Logger.info('\awPreManaCheck: \ay%s', Settings.general.PreManaCheck)
 Logger.info('\awBurn: \ay%s', Settings.general.Burn)
 Logger.info('\awOpen Chest: \ay%s', Settings.general.OpenChest)
 Logger.info('\awBest For Last: \ay%s', Settings.general.BestForLast)
@@ -102,10 +105,11 @@ if mq.TLO.Group.AnyoneMissing() then
     os.exit()
 end
 -- Check group mana / endurance / hp
-while Ready == false do 
+while Settings.general.PreManaCheck == true and Ready == false do 
 	Ready = CheckGroupStats()
 	mq.cmd('/noparse /dgga /if (${Me.Standing}) /sit')
-	mq.delay(5000)
+    Logger.info('Waiting for full hp / mana/ endurance to proceed...')
+	mq.delay(15000)
     ZoneCheck(quest_zone)
     TaskCheck(Task_Name)
 end
@@ -128,13 +132,12 @@ if (mq.TLO.Me.X() < 235 and mq.TLO.Me.Y() > -90) then
 end
 if math.abs(mq.TLO.Me.Y() + 286) > 15 or math.abs(mq.TLO.Me.X() + 282) > 15 then
     -- We are not near the camp spot, so lets move there
+    Logger.info('Moving to camp spot...')
     mq.cmd('/squelch /dgga /nav locyx -286 -282 log=off')
     WaitForNav()
 end
 
 Logger.info('Doing some setup...')
-
-mq.delay(2000)
 
 DoPrep()
 
@@ -145,11 +148,16 @@ mq.delay(10000)
 mq.cmd('/squelch /nav locyx -240 50 log=off')
 WaitForNav()
 
+Logger.info('Starting the event...')
 MoveToAndSay('Atathus', 'fight')
 
 mq.cmdf('/%s gotocamp', my_class)
+-- mq.cmd('/squelch /nav locyx -240 50 log=off')
+WaitForNav()
 
 -- This section was waiting till all the starting adds were killed to do the rest of the script
+
+Logger.info('Killing the 4 initial adds...')
 while mq.TLO.SpawnCount("Hazuri xtarhater")() < 1 do
     if (mq.TLO.SpawnCount('unmodified experiment npc radius 60')() > 0) then
         Logger.debug('experiment Attack branch...')
@@ -186,6 +194,10 @@ while true do
 	end
 
     if (mq.TLO.SpawnCount('Brood Architect Hazuri npc')() > 0 and mq.TLO.Spawn('Brood Architect Hazuri').PctHPs() < 10 and mq.TLO.SpawnCount('Hazuri Replicant npc')() == 0) then 
+        if (section ~= 1) then 
+            section = 1
+            Logger.info('All Replicants are dead, so killing Brood Architect Hazuri...')
+        end
         Logger.debug('Brood Architect Hazuri Attack branch at end...')
         MoveToTargetAndAttack('Brood Architect Hazuri')
 	elseif (mq.TLO.SpawnCount('An altered artificer npc')() + mq.TLO.SpawnCount('An altered skyguard npc')() 
@@ -194,29 +206,64 @@ while true do
 		then 
 		--Logger.debug('In AddsUp section')
 		if mq.TLO.SpawnCount('Brood Architect Hazuri npc')() > 0 and mq.TLO.Spawn('Brood Architect Hazuri').PctHPs() < 10 and mq.TLO.SpawnCount('Hazuri Replicant npc radius 60')() > 0 then 
+            if (section ~= 2) then 
+                section = 2
+                Logger.info('Hazuri < 10 so attacking Replicants...')
+            end
 			Logger.debug('Hazuri < 10 Replicant Attack branch...')
             -- mq.cmd('/hidecorpse npc') -- temporary solution to hide Hazuri corpse
             MoveToTargetAndAttack('Hazuri Replicant')
         elseif mq.TLO.SpawnCount('Hazuri Replicant npc radius 60')() > 0 and Settings.general.BestForLast == false then 
+            if (section ~= 3) then 
+                section = 3
+                Logger.info('Not doing the Best for Last so killing the Replicants...')
+            end
 			Logger.debug('Replicant No BestForLast branch...')
             MoveToTargetAndAttack('Hazuri Replicant')
+        elseif mq.TLO.SpawnCount('Atathus npc radius 60')() > 0 then 
+			-- Logger.debug('Atathus Attack branch...')
+            if (section ~= 4) then 
+                section = 4
+                Logger.info('Killing Atathus...')
+            end
+            MoveToTargetAndAttack('Atathus')
         elseif mq.TLO.SpawnCount('An altered artificer npc radius 60')() > 0 then 
 			-- Logger.debug('artificer Attack branch...')
+            if (section ~= 5) then 
+                section = 5
+                Logger.info('Killing the altered artificer...')
+            end
             MoveToTargetAndAttack('An altered artificer')
 		elseif mq.TLO.SpawnCount('An altered skyguard npc radius 60')() > 0 then 
+            if (section ~= 6) then 
+                section = 6
+                Logger.info('Killing the altered skyguard...')
+            end
 			-- Logger.debug('skyguard Attack branch...')
             MoveToTargetAndAttack('An altered skyguard')
 		elseif mq.TLO.SpawnCount('An altered striker npc radius 60')() > 0 then 
+            if (section ~= 7) then 
+                section = 7
+                Logger.info('Killing the altered striker...')
+            end
 			-- Logger.debug('striker Attack branch...')
 			MoveToTargetAndAttack('An altered striker')
 		elseif mq.TLO.SpawnCount('An altered overseer npc radius 60')() > 0 then 
-			-- Logger.debug('overseer Attack branch...')
+			if (section ~= 8) then 
+                section = 8
+                Logger.info('Killing the altered overseer...')
+            end
+            -- Logger.debug('overseer Attack branch...')
 			MoveToTargetAndAttack('An altered overseer')
 		else  
 			StopAttack()
 		end
 	else
         if mq.TLO.SpawnCount('Brood Architect Hazuri npc')() > 0 then 
+            if (section ~= 9) then 
+                section = 9
+                Logger.info('Attacking Brood Architect Hazuri...')
+            end
             Logger.debug('Brood Architect Hazuri Attack branch...')
             MoveToTargetAndAttack('Brood Architect Hazuri') 
         end

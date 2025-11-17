@@ -30,6 +30,10 @@ Load_settings=function ()
             Settings.general.Automation = 'CWTN'
             is_dirty = true
         end
+        if (Settings.general.PreManaCheck == nil) then
+            Settings.general.PreManaCheck = false
+            is_dirty = true
+        end
         if (Settings.general.Burn == nil) then
             Settings.general.Burn = true
             is_dirty = true
@@ -381,7 +385,7 @@ CheckGroupStats = function()
     if mq.TLO.Group.AnyoneMissing() then return false end
    
     for i = groupSize, 0, -1 do
-		-- if DEBUG and ( mq.TLO.Group.Member(i).PctHPs() < 99 or  mq.TLO.Group.Member(i).PctEndurance() < 99 or (mq.TLO.Group.Member(i).PctMana() ~= 0 and  mq.TLO.Group.Member(i).PctMana() < 99)) then 
+		-- if DEBUG and ( mq.TLO.Group.Member(i).PctHPs() < 98 or  mq.TLO.Group.Member(i).PctEndurance() < 98 or (mq.TLO.Group.Member(i).PctMana() ~= 0 and  mq.TLO.Group.Member(i).PctMana() < 98)) then 
 		-- 	printf('%s : %s : %s : %s', mq.TLO.Group.Member(i).CleanName(), mq.TLO.Group.Member(i).PctHPs(), mq.TLO.Group.Member(i).PctEndurance(), mq.TLO.Group.Member(i).PctMana() )
 		-- end
 		if mq.TLO.Group.Member(i).PctHPs() < 99 then ready = false end
