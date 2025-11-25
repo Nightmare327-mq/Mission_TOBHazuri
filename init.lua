@@ -115,7 +115,7 @@ while Settings.general.PreManaCheck == true and Ready == false do
 end
 
 -- in case you are starting the script after you are in the mission zone - need to determine what area you are close to
-if (mq.TLO.Me.X() < 235 and mq.TLO.Me.Y() > -90) then
+if (mq.TLO.Me.X() < 270 and mq.TLO.Me.Y() > -190) then
     Logger.debug('Top section by zone in: X:%s Y:%s', mq.TLO.Me.X(), mq.TLO.Me.Y())
     Logger.info('Doing some setup. Invising and moving to camp spot.')
 

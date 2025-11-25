@@ -197,51 +197,63 @@ end
 
 ClassShortName = function(x)
     local y = mq.TLO.Group.Member(x).Class.ShortName()
+    if mq.TLO.Group.Member(x).Mercenary() == true then 
+        y = 'NIL'
+    end
     return y
 end
 
 All_Invis = function(mode)
-    
+    local anyoneNotInvis = false
     local all_invis_status = false
-    local grpsize = mq.TLO.Group.Members()
+    local grpsize = mq.TLO.Group.Members() 
 
     for gm = 0,grpsize do
-        local name = mq.TLO.Group.Member(gm).Name()
-        local result1 = Query(name, 'Me.Invis[1]', 100) 
-        local result2 = Query(name, 'Me.Invis[2]', 100)
-        local invis_result = false
+        if mq.TLO.Group.Member(gm).Mercenary() == false then 
+            local name = mq.TLO.Group.Member(gm).Name()
+            local result1 = Query(name, 'Me.Invis[1]', 100) 
+            local result2 = Query(name, 'Me.Invis[2]', 100)
+            local invis_result = false
+            
+            if mode == 1 then 
+                if result1 == 'TRUE' then
+                    invis_result = true
+                    Logger.debug(string.format("\ay%s \at%s \ag%s", name, "Invis: ", invis_result))
+                else
+                    Logger.debug('group member'..gm)
+                    anyoneNotInvis = true
+                    break
+                end
+            end
+            if mode == 2 then 
+                if result2 == 'TRUE' then
+                    invis_result = true
+                    Logger.debug(string.format("\ay%s \at%s \ag%s", name, "DBL Invis: ", invis_result))
+                else
+                    Logger.debug('group member'..gm)
+                    anyoneNotInvis = true
+                    break
+                end
+            end
+            if mode == 3 then 
+                if result1 == 'TRUE' and result2 == 'TRUE' then
+                    invis_result = true
+                    Logger.debug(string.format("\ay%s \at%s \ag%s", name, "DBL Invis: ", invis_result))
+                else
+                    Logger.debug('group member'..gm)
+                    anyoneNotInvis = true
+                    break
+                end
+            end
+        end
         
-        if mode == 1 then 
-            if result1 == 'TRUE' then
-                invis_result = true
-                Logger.debug(string.format("\ay%s \at%s \ag%s", name, "Invis: ", invis_result))
-            else
-                Logger.debug('group member'..gm)
-                break
-            end
-        end
-        if mode == 2 then 
-            if result2 == 'TRUE' then
-                invis_result = true
-                Logger.debug(string.format("\ay%s \at%s \ag%s", name, "DBL Invis: ", invis_result))
-            else
-                Logger.debug('group member'..gm)
-                break
-            end
-        end
-        if mode == 3 then 
-            if result1 == 'TRUE' and result2 == 'TRUE' then
-                invis_result = true
-                Logger.debug(string.format("\ay%s \at%s \ag%s", name, "DBL Invis: ", invis_result))
-            else
-                Logger.debug('group member'..gm)
-                break
-            end
-        end
 
         if gm == grpsize then
             all_invis_status = true
         end
+        Logger.debug('all_invis_status: %s | anyoneNotInvis: %s', all_invis_status, anyoneNotInvis)
+        all_invis_status = not anyoneNotInvis
+        Logger.debug('all_invis_status: %s | anyoneNotInvis: %s', all_invis_status, anyoneNotInvis)
     end
     return all_invis_status
 end
@@ -388,9 +400,11 @@ CheckGroupStats = function()
 		-- if DEBUG and ( mq.TLO.Group.Member(i).PctHPs() < 98 or  mq.TLO.Group.Member(i).PctEndurance() < 98 or (mq.TLO.Group.Member(i).PctMana() ~= 0 and  mq.TLO.Group.Member(i).PctMana() < 98)) then 
 		-- 	printf('%s : %s : %s : %s', mq.TLO.Group.Member(i).CleanName(), mq.TLO.Group.Member(i).PctHPs(), mq.TLO.Group.Member(i).PctEndurance(), mq.TLO.Group.Member(i).PctMana() )
 		-- end
-		if mq.TLO.Group.Member(i).PctHPs() < 99 then ready = false end
-		if mq.TLO.Group.Member(i).PctEndurance() < 99 then ready = false end
-		if mq.TLO.Group.Member(i).PctMana() ~= 0 and mq.TLO.Group.Member(i).PctMana() < 99 then ready = false end
+        if mq.TLO.Group.Member(i).Mercenary() ~= true then 
+            if mq.TLO.Group.Member(i).PctHPs() < 99 then ready = false end
+            if mq.TLO.Group.Member(i).PctEndurance() < 99 then ready = false end
+            if mq.TLO.Group.Member(i).PctMana() ~= 0 and mq.TLO.Group.Member(i).PctMana() < 99 then ready = false end
+        end
     end
 	-- mq.delay(5000)
     return ready
@@ -409,7 +423,7 @@ CheckGroupDistance = function (max_distance)
         local member = mq.TLO.Group.Member(i)
         
         -- Check if the member exists and is not null (e.g., they are in the zone)
-        if member() then
+        if member() and member.Mercenary() == false then
             -- Get the distance from yourself (mq.TLO.Me) to the group member
             local distance = member.Distance()
             Logger.debug('Group Member %s is at distance %s', member.Name(), distance)
@@ -446,16 +460,18 @@ ZoneIn = function(npcName, zoneInPhrase, quest_zone)
     local GroupSize = mq.TLO.Group.Members()
 
     for g = 1, GroupSize, 1 do
-        local Member = mq.TLO.Group.Member(g).Name()
-        Logger.info('\ay-->%s<--\apShould Be Zoning In Now', Member)
-        mq.cmdf('/dex %s /eqtarget %s', Member, npcName)
-        mq.delay(math.random(2000, 4000))
-        mq.cmdf('/dex %s /say %s', Member, zoneInPhrase)
-        local groupSpawn = mq.TLO.Group.Member(g).Spawn()
-        while groupSpawn ~= nil do 
-            mq.delay(5000)
-            Logger.debug('Waiting on %s to zone in...', Member)
-            groupSpawn = mq.TLO.Group.Member(g).Spawn()
+        local memberName = mq.TLO.Group.Member(g).Name()
+        if mq.TLO.Group.Member(g).Mercenary() ~= true then 
+            Logger.info('\ay-->%s<--\apShould Be Zoning In Now', memberName)
+            mq.cmdf('/dex %s /eqtarget %s', memberName, npcName)
+            mq.delay(math.random(2000, 4000))
+            mq.cmdf('/dex %s /say %s', memberName, zoneInPhrase)
+            local groupSpawn = mq.TLO.Group.Member(g).Spawn()
+            while groupSpawn ~= nil do 
+                mq.delay(5000)
+                Logger.debug('Waiting on %s to zone in...', memberName)
+                groupSpawn = mq.TLO.Group.Member(g).Spawn()
+            end
         end
     end
 
@@ -563,8 +579,10 @@ GetGroupMembersNotInZone = function()
     local missing = {}
     for i = 1, mq.TLO.Me.GroupSize() do
         local name = GetGroupMemberName(i)
-        if name and not mq.TLO.Spawn("pc = " .. name)() then
-            table.insert(missing, name)
+        if mq.TLO.Group.Member(i).Mercenary() == false  then
+            if name and not mq.TLO.Spawn("pc = " .. name)() then
+                table.insert(missing, name)
+            end    
         end
     end
     return missing
